@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArborVeil — Forest Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --deep:#020a04;
+  --bio:#7eff9a;
+  --bio-light:#c8f5b0;
+  --text:#e2f0e6;
+  --text-dim:#7aaa8a;
+  --bark:#4a2e0e;
+  --forest:#0d3b1e;
+}
+html{scroll-behavior:smooth}
+body{background:var(--deep);color:var(--text);font-family:'Source Sans 3',sans-serif;cursor:none;overflow-x:hidden}
+
+/* CURSOR */
+#cur{position:fixed;pointer-events:none;z-index:9999;width:40px;height:40px;transform:translate(-50%,-50%)}
+#cur svg{width:100%;height:100%;animation:cur-spin 8s linear infinite}
+@keyframes cur-spin{to{transform:rotate(360deg)}}
+#cur-d{position:fixed;pointer-events:none;z-index:10000;width:5px;height:5px;background:var(--bio);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px var(--bio)}
+
+/* NOISE */
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:9997;mix-blend-mode:overlay}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 3.5rem;background:linear-gradient(180deg,rgba(2,10,4,.95) 0%,transparent 100%);backdrop-filter:blur(0px)}
+.logo{font-family:'DM Serif Display',serif;font-size:1.5rem;color:var(--bio-light);letter-spacing:.02em}.logo b{color:var(--bio)}
+nav ul{display:flex;gap:2.5rem;list-style:none}
+nav a{color:var(--text-dim);text-decoration:none;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;transition:color .3s}
+nav a:hover{color:var(--bio)}
+.nav-btn{border:1px solid rgba(126,255,154,.4)!important;color:var(--bio)!important;padding:.45rem 1.3rem;border-radius:2px;transition:background .3s,color .3s!important}
+.nav-btn:hover{background:var(--bio)!important;color:var(--deep)!important}
+
+/* HERO */
+#hero{position:relative;width:100%;height:100vh;overflow:hidden}
+#c1{position:absolute;inset:0;width:100%;height:100%;display:block}
+.h-over{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(2,10,4,.85) 0%,transparent 60%);pointer-events:none}
+.rays{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ray{position:absolute;top:-10%;width:2px;background:linear-gradient(180deg,rgba(126,255,154,.18) 0%,transparent 70%);transform-origin:top center;animation:ray-sway 6s ease-in-out infinite alternate}
+.ray:nth-child(1){left:15%;height:70%;animation-delay:0s;transform:rotate(-8deg)}
+.ray:nth-child(2){left:28%;height:85%;animation-delay:-1s;transform:rotate(-3deg);width:3px;opacity:.7}
+.ray:nth-child(3){left:44%;height:60%;animation-delay:-2s;transform:rotate(2deg)}
+.ray:nth-child(4){left:58%;height:75%;animation-delay:-.5s;transform:rotate(6deg);width:4px;opacity:.5}
+.ray:nth-child(5){left:72%;height:65%;animation-delay:-1.5s;transform:rotate(9deg)}
+.ray:nth-child(6){left:85%;height:80%;animation-delay:-3s;transform:rotate(-4deg);width:3px}
+@keyframes ray-sway{0%{opacity:.4;transform:rotate(var(--r,0deg)) scaleX(1)}100%{opacity:.9;transform:rotate(calc(var(--r,0deg) + 3deg)) scaleX(1.3)}}
+
+.hero-ui{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}
+.h-eye{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--bio);margin-bottom:1.8rem;opacity:0}
+.h-title{font-family:'DM Serif Display',serif;font-size:clamp(3.5rem,10vw,9rem);line-height:.95;letter-spacing:-.03em;color:var(--bio-light);text-shadow:0 0 120px rgba(126,255,154,.18),0 2px 0 rgba(0,0,0,.8);opacity:0;margin-bottom:1.8rem}
+.h-title em{color:var(--bio);font-style:italic}
+.h-sub{font-size:1rem;color:var(--text-dim);max-width:460px;line-height:1.8;opacity:0;margin-bottom:2.8rem}
+.btn{position:relative;display:inline-flex;align-items:center;gap:.8rem;padding:1rem 2.5rem;border:1px solid var(--bio);color:var(--bio);font-family:'Source Sans 3',sans-serif;font-size:.8rem;letter-spacing:.15em;text-transform:uppercase;text-decoration:none;cursor:none;opacity:0;overflow:hidden;transition:color .5s}
+.btn::before{content:'';position:absolute;inset:0;background:var(--bio);transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.77,0,.175,1);z-index:-1}
+.btn:hover{color:var(--deep)}.btn:hover::before{transform:scaleX(1)}
+.btn-ring{position:absolute;inset:-5px;border:1px solid rgba(126,255,154,.5);border-radius:1px;animation:ring-pulse 3s ease-out infinite}
+@keyframes ring-pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.1)}}
+.scroll-ind{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.6rem;opacity:0;animation:ind-bounce 2s ease-in-out infinite}
+.scroll-ind span{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim)}
+.scroll-ind::after{content:'';width:1px;height:44px;background:linear-gradient(to bottom,var(--bio),transparent)}
+@keyframes ind-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+
+/* SECTIONS */
+section{position:relative;padding:9rem 4rem}
+.sec-lbl{font-size:.65rem;letter-spacing:.35em;text-transform:uppercase;color:var(--bio);margin-bottom:.9rem}
+.sec-title{font-family:'DM Serif Display',serif;font-size:clamp(2rem,5vw,3.8rem);line-height:1.08;color:var(--bio-light);margin-bottom:1.5rem}
+
+/* STATS */
+#stats{background:linear-gradient(180deg,var(--deep) 0%,#060f08 100%)}
+.stats-wrap{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1.1fr;gap:6rem;align-items:center}
+.stats-txt p{color:var(--text-dim);font-size:1rem;line-height:1.85;max-width:420px;margin-top:.5rem}
+.s-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.s-card{background:linear-gradient(135deg,rgba(13,59,30,.5) 0%,rgba(2,10,4,.8) 100%);border:1px solid rgba(126,255,154,.1);border-radius:6px;padding:1.8rem 1.5rem;position:relative;overflow:hidden;opacity:0;transform:translateY(35px);transition:border-color .4s,transform .4s,box-shadow .4s}
+.s-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--bio),transparent);opacity:0;transition:opacity .4s}
+.s-card:hover{border-color:rgba(126,255,154,.3);transform:translateY(-5px)!important;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 30px rgba(126,255,154,.05)}
+.s-card:hover::before{opacity:1}
+.s-ico{font-size:1.4rem;margin-bottom:.9rem;display:block}
+.s-num{font-family:'DM Serif Display',serif;font-size:2.8rem;color:var(--bio);line-height:1;margin-bottom:.3rem;text-shadow:0 0 30px rgba(126,255,154,.3)}
+.s-lbl{font-size:.75rem;letter-spacing:.1em;color:var(--text-dim);text-transform:uppercase}
+
+/* 3D TREE CANVAS (stats accent) */
+#c-tree{position:absolute;right:0;top:50%;transform:translateY(-50%);width:320px;height:420px;pointer-events:none;opacity:.5}
+
+/* SERVICES */
+#services{background:#060f08;padding-bottom:5rem}
+.srv-head{max-width:1200px;margin:0 auto 3rem}
+.srv-row{display:flex;gap:1.5rem;padding:0 4rem 2rem;overflow-x:auto;scrollbar-width:none;cursor:grab}
+.srv-row::-webkit-scrollbar{display:none}
+.srv-card{flex:0 0 300px;background:linear-gradient(160deg,rgba(13,59,30,.4),rgba(2,10,4,.9));border:1px solid rgba(126,255,154,.08);border-radius:8px;padding:2.2rem 1.8rem;transform-style:preserve-3d;position:relative;overflow:hidden;transition:border-color .3s}
+.srv-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(126,255,154,.07),transparent 55%);pointer-events:none}
+.srv-card:hover{border-color:rgba(126,255,154,.22)}
+.srv-n{font-family:'DM Serif Display',serif;font-size:3.5rem;color:rgba(126,255,154,.08);line-height:1;margin-bottom:.8rem}
+.srv-ico{width:46px;height:46px;border:1px solid rgba(126,255,154,.18);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:1.3rem;background:rgba(126,255,154,.04)}
+.srv-title{font-family:'DM Serif Display',serif;font-size:1.3rem;color:var(--bio-light);margin-bottom:.7rem}
+.srv-desc{font-size:.88rem;color:var(--text-dim);line-height:1.75}
+
+/* GLOBE */
+#viz{background:var(--deep);min-height:85vh;display:flex;align-items:center}
+.viz-in{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center}
+#c-globe{display:block;width:100%;aspect-ratio:1;filter:drop-shadow(0 0 60px rgba(126,255,154,.12))}
+.d-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.5rem}
+.d-tag{padding:.35rem 1rem;border:1px solid rgba(126,255,154,.18);border-radius:100px;font-size:.72rem;color:var(--bio);letter-spacing:.05em;transition:background .3s,color .3s}
+.d-tag:hover{background:var(--bio);color:var(--deep)}
+
+/* CTA */
+#cta{background:linear-gradient(180deg,var(--deep) 0%,#040d06 100%);text-align:center;overflow:hidden}
+.mist{position:absolute;bottom:0;left:-10%;right:-10%;height:300px;background:radial-gradient(ellipse at center bottom,rgba(13,59,30,.25) 0%,transparent 70%);animation:mist-move 7s ease-in-out infinite alternate;pointer-events:none}
+.mist2{animation-delay:-3.5s;animation-duration:9s;opacity:.6}
+@keyframes mist-move{0%{transform:scaleX(1) translateX(0)}100%{transform:scaleX(1.08) translateX(2%)}}
+.cta-in{position:relative;z-index:2;max-width:580px;margin:0 auto}
+.cta-in p{color:var(--text-dim);margin-bottom:2.5rem;line-height:1.8}
+.cta-form{display:flex;max-width:460px;margin:0 auto}
+.cta-form input{flex:1;padding:.95rem 1.4rem;background:rgba(13,59,30,.35);border:1px solid rgba(126,255,154,.2);border-right:none;border-radius:3px 0 0 3px;color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:.9rem;outline:none;transition:border-color .3s}
+.cta-form input::placeholder{color:var(--text-dim)}
+.cta-form input:focus{border-color:rgba(126,255,154,.5)}
+.cta-form button{padding:.95rem 2rem;background:var(--bio);border:none;border-radius:0 3px 3px 0;color:var(--deep);font-family:'Source Sans 3',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:none;transition:background .3s}
+.cta-form button:hover{background:var(--bio-light)}
+
+/* FOOTER */
+footer{padding:2.5rem 4rem;border-top:1px solid rgba(126,255,154,.07);display:flex;justify-content:space-between;align-items:center;background:var(--deep)}
+footer p{font-size:.78rem;color:var(--text-dim)}
+.f-logo{font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--bio-light)}
+
+.reveal{opacity:0;transform:translateY(28px)}
+@media(max-width:768px){
+  nav{padding:1rem 1.5rem}nav ul{display:none}
+  section{padding:5rem 1.5rem}
+  .stats-wrap,.viz-in{grid-template-columns:1fr;gap:3rem}
+  .srv-row{padding:0 1.5rem 2rem}
+  .cta-form{flex-direction:column}
+  .cta-form input,.cta-form button{border-radius:3px;border:1px solid rgba(126,255,154,.2)}
+  footer{flex-direction:column;gap:1rem;text-align:center}
+  #c-tree{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="cur">
+  <svg viewBox="0 0 40 40" fill="none">
+    <circle cx="20" cy="20" r="18" stroke="#7eff9a" stroke-width=".8" stroke-dasharray="2.5 4"/>
+    <line x1="20" y1="6" x2="20" y2="34" stroke="#7eff9a" stroke-width=".7"/>
+    <line x1="6" y1="20" x2="34" y2="20" stroke="#7eff9a" stroke-width=".7"/>
+    <path d="M20 13 C17.5 15.5 17.5 22 20 24.5 C22.5 22 22.5 15.5 20 13Z" fill="#7eff9a" opacity=".6"/>
+    <circle cx="20" cy="20" r="2" fill="#7eff9a" opacity=".8"/>
+  </svg>
+</div>
+<div id="cur-d"></div>
+
+<nav>
+  <div class="logo">Arbor<b>Veil</b></div>
+  <ul>
+    <li><a href="#stats">About</a></li>
+    <li><a href="#services">Services</a></li>
+    <li><a href="#viz">Data</a></li>
+    <li><a href="#cta" class="nav-btn">Get Access</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <canvas id="c1"></canvas>
+  <div class="rays">
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+    <div class="ray"></div><div class="ray"></div><div class="ray"></div>
+  </div>
+  <div class="h-over"></div>
+  <div class="hero-ui">
+    <p class="h-eye">Forest Intelligence Platform · Est. 2020</p>
+    <h1 class="h-title">Sustain.<br><em>Protect.</em><br>Grow.</h1>
+    <p class="h-sub">Advanced forest stewardship powered by real-time ecological intelligence, satellite sensing, and precision conservation science.</p>
+    <a href="#cta" class="btn">
+      <span>Begin Your Mission</span>
+      <span class="btn-ring"></span>
+    </a>
+  </div>
+  <div class="scroll-ind"><span>Explore</span></div>
+</section>
+
+<!-- STATS -->
+<section id="stats">
+  <canvas id="c-tree"></canvas>
+  <div class="stats-wrap">
+    <div class="stats-txt reveal">
+      <p class="sec-lbl">By the Numbers</p>
+      <h2 class="sec-title">Forests are Earth's oldest living system.</h2>
+      <p>ArborVeil combines ground-level sensors, satellite imagery, and machine learning to give forest managers the most accurate, real-time picture of ecosystem health ever assembled — at global scale.</p>
+    </div>
+    <div class="s-grid">
+      <div class="s-card"><span class="s-ico">🌳</span><div class="s-num" data-t="4.2" data-s="M+">0</div><div class="s-lbl">Hectares Managed</div></div>
+      <div class="s-card"><span class="s-ico">💨</span><div class="s-num" data-t="890" data-s="K">0</div><div class="s-lbl">Tonnes CO₂ Offset</div></div>
+      <div class="s-card"><span class="s-ico">🦋</span><div class="s-num" data-t="12" data-s="K+">0</div><div class="s-lbl">Species Protected</div></div>
+      <div class="s-card"><span class="s-ico">🌱</span><div class="s-num" data-t="34" data-s="M">0</div><div class="s-lbl">Trees Replanted</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section id="services">
+  <div class="srv-head">
+    <p class="sec-lbl reveal">What We Do</p>
+    <h2 class="sec-title reveal">End-to-end forest<br>intelligence.</h2>
+  </div>
+  <div class="srv-row" id="srv-row">
+    <div class="srv-card"><div class="srv-n">01</div><div class="srv-ico">🛰️</div><h3 class="srv-title">Forest Monitoring</h3><p class="srv-desc">Continuous satellite & drone surveillance detecting deforestation events, wildfire ignition, and encroachment within minutes of occurrence.</p></div>
+    <div class="srv-card"><div class="srv-n">02</div><div class="srv-ico">🌿</div><h3 class="srv-title">Reforestation Planning</h3><p class="srv-desc">AI site-analysis and native species modeling that maximizes biodiversity, soil retention, and 50-year ecosystem resilience projections.</p></div>
+    <div class="srv-card"><div class="srv-n">03</div><div class="srv-ico">📊</div><h3 class="srv-title">Carbon Credit Management</h3><p class="srv-desc">Verified, blockchain-anchored sequestration tracking integrated with global carbon marketplaces for transparent climate finance.</p></div>
+    <div class="srv-card"><div class="srv-n">04</div><div class="srv-ico">🦅</div><h3 class="srv-title">Wildlife Habitat Analysis</h3><p class="srv-desc">Bioacoustic arrays and camera-trap networks processed by CV models to map species corridors across millions of hectares.</p></div>
+    <div class="srv-card"><div class="srv-n">05</div><div class="srv-ico">💧</div><h3 class="srv-title">Watershed Management</h3><p class="srv-desc">Hydrological modelling and soil-carbon profiling to protect the water-cycle services healthy forests deliver to downstream populations.</p></div>
+  </div>
+</section>
+
+<!-- GLOBE -->
+<section id="viz">
+  <div class="viz-in">
+    <canvas id="c-globe"></canvas>
+    <div>
+      <p class="sec-lbl reveal">Global Intelligence</p>
+      <h2 class="sec-title reveal">Living maps of every<br>forest we protect.</h2>
+      <p class="reveal" style="color:var(--text-dim);line-height:1.8;margin-bottom:1rem">Our platform fuses Sentinel-2 multispectral data, LiDAR point clouds, and IoT ground sensors into a unified real-time intelligence layer accessible from any device, anywhere.</p>
+      <div class="d-tags reveal">
+        <span class="d-tag">LiDAR Scanning</span>
+        <span class="d-tag">Sentinel-2 Imagery</span>
+        <span class="d-tag">NDVI Analysis</span>
+        <span class="d-tag">Fire Risk Index</span>
+        <span class="d-tag">Soil Carbon Maps</span>
+        <span class="d-tag">Canopy Height Model</span>
+        <span class="d-tag">Species Corridors</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="mist"></div><div class="mist mist2"></div>
+  <div class="cta-in">
+    <p class="sec-lbl reveal">Join the Mission</p>
+    <h2 class="sec-title reveal">The forest<br>needs guardians.</h2>
+    <p class="reveal">Request early access to ArborVeil's platform and join a global network of scientists, governments, and conservationists protecting the ecosystems that sustain all life.</p>
+    <div class="cta-form reveal">
+      <input type="email" placeholder="your@organization.com">
+      <button>Request Access</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="f-logo">ArborVeil</div>
+  <p>© 2025 ArborVeil Forest Intelligence. Protecting what matters most.</p>
+  <p style="color:var(--bio);font-size:.72rem">40+ Countries · 4.2M Ha · Since 2020</p>
+</footer>
+
+<script>
+// ─── CURSOR ───────────────────────────────────────────────
+const cur = document.getElementById('cur'), curD = document.getElementById('cur-d');
+let cx=0,cy=0,mx=0,my=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;curD.style.left=mx+'px';curD.style.top=my+'px'});
+(function ac(){cx+=(mx-cx)*.1;cy+=(my-cy)*.1;cur.style.left=cx+'px';cur.style.top=cy+'px';requestAnimationFrame(ac)})();
+
+// ─── HERO: REALISTIC 3D FOREST ──────────────────────────────
+(function(){
+  const canvas = document.getElementById('c1');
+  const W = ()=>canvas.offsetWidth, H = ()=>canvas.offsetHeight;
+  
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(W(),H());
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.physicallyCorrectLights = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.85;
+  renderer.setClearColor(0x020a04,1);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x061208, 0.028);
+  scene.background = new THREE.Color(0x020a04);
+
+  const camera = new THREE.PerspectiveCamera(55, W()/H(), 0.1, 300);
+  camera.position.set(0,3.5,26);
+
+  // ── LIGHTING (Physically correct) ──
+  // Sky ambient
+  const hemi = new THREE.HemisphereLight(0x223a2a, 0x0a1a0a, 1.8);
+  scene.add(hemi);
+
+  // Sun — warm directional casting real shadows
+  const sun = new THREE.DirectionalLight(0xfff5d6, 2.5);
+  sun.position.set(18, 35, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 120;
+  sun.shadow.camera.left = -40;
+  sun.shadow.camera.right = 40;
+  sun.shadow.camera.top = 40;
+  sun.shadow.camera.bottom = -40;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.radius = 4;
+  scene.add(sun);
+
+  // Green bounce — sub-surface scatter simulation
+  const bounce = new THREE.PointLight(0x2dff60, 1.2, 60, 2);
+  bounce.position.set(-8, 2, 0);
+  scene.add(bounce);
+
+  // Cool backlight / rim
+  const rim = new THREE.DirectionalLight(0x1a4a8a, 0.5);
+  rim.position.set(-20, 10, -15);
+  scene.add(rim);
+
+  // Firefly point lights (dappled light through canopy)
+  const dappledLights = [];
+  for(let i=0;i<6;i++){
+    const pl = new THREE.PointLight(0x7eff9a, 0.3+Math.random()*0.4, 12, 2);
+    pl.position.set((Math.random()-0.5)*30, 4+Math.random()*6, (Math.random()-0.5)*20);
+    scene.add(pl);
+    dappledLights.push({light:pl, ox:pl.position.x, oz:pl.position.z, ph:Math.random()*Math.PI*2});
+  }
+
+  // ── GROUND ──
+  const groundGeo = new THREE.PlaneGeometry(120,120,80,80);
+  const gPos = groundGeo.attributes.position;
+  for(let i=0;i<gPos.count;i++){
+    const x=gPos.getX(i), z=gPos.getZ(i);
+    gPos.setZ(i, Math.sin(x*0.3)*0.3 + Math.cos(z*0.25)*0.25 + (Math.random()-0.5)*0.4);
+  }
+  groundGeo.computeVertexNormals();
+
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x0a1a09,
+    roughness: 1.0,
+    metalness: 0,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -2.4;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Forest floor moss patches
+  for(let i=0;i<30;i++){
+    const r = 2+Math.random()*30, a = Math.random()*Math.PI*2;
+    const patchGeo = new THREE.CircleGeometry(0.5+Math.random()*1.5, 8);
+    const patchMat = new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(0.35,0.6,0.05+Math.random()*0.04), roughness:1, metalness:0});
+    const patch = new THREE.Mesh(patchGeo, patchMat);
+    patch.rotation.x = -Math.PI/2;
+    patch.position.set(Math.cos(a)*r, -2.38, Math.sin(a)*r - 4);
+    patch.receiveShadow = true;
+    scene.add(patch);
+  }
+
+  // ── REALISTIC TREE BUILDER ──
+  function buildTree(x, z, scale, variety) {
+    const group = new THREE.Group();
+    const trunkH = (3.5 + Math.random()*2.5) * scale;
+    const trunkBot = (0.18 + Math.random()*0.06) * scale;
+    const trunkTop = (0.09 + Math.random()*0.03) * scale;
+    
+    // Trunk with taper
+    const trunkGeo = new THREE.CylinderGeometry(trunkTop, trunkBot, trunkH, 8, 6);
+    // Bend trunk slightly
+    const tp = trunkGeo.attributes.position;
+    for(let i=0;i<tp.count;i++){
+      const y = tp.getY(i);
+      const t = (y+trunkH/2)/trunkH;
+      tp.setX(i, tp.getX(i) + t*t*0.15*scale*(Math.random()-.5));
+    }
+    trunkGeo.computeVertexNormals();
+
+    const trunkColor = new THREE.Color().setHSL(0.07, 0.45, 0.12+Math.random()*0.06);
+    const trunkMat = new THREE.MeshStandardMaterial({color:trunkColor, roughness:0.92, metalness:0.01});
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = trunkH/2;
+    trunk.castShadow = true; trunk.receiveShadow = true;
+    group.add(trunk);
+
+    // Root flares
+    for(let r=0;r<5;r++){
+      const angle = (r/5)*Math.PI*2;
+      const flareGeo = new THREE.CylinderGeometry(trunkBot*.3, trunkBot*.9, trunkH*0.18, 4, 1);
+      const flare = new THREE.Mesh(flareGeo, trunkMat);
+      flare.position.set(Math.cos(angle)*trunkBot*1.6, -trunkH/2+trunkH*0.09, Math.sin(angle)*trunkBot*1.6);
+      flare.rotation.z = Math.cos(angle)*0.35;
+      flare.rotation.x = Math.sin(angle)*0.35;
+      trunk.add(flare);
+    }
+
+    // Main branches
+    const branchCount = 4 + Math.floor(Math.random()*3);
+    const branches = [];
+    for(let b=0;b<branchCount;b++){
+      const bAngle = (b/branchCount)*Math.PI*2 + Math.random()*0.5;
+      const bHeight = trunkH * (0.45 + b/branchCount*0.45);
+      const bLen = (0.9+Math.random()*0.8)*scale;
+      const bGeo = new THREE.CylinderGeometry(trunkTop*0.4, trunkTop*0.7, bLen, 5, 3);
+      const br = new THREE.Mesh(bGeo, trunkMat);
+      br.position.set(Math.cos(bAngle)*bLen/2, bHeight-trunkH/2, Math.sin(bAngle)*bLen/2);
+      br.rotation.z = Math.cos(bAngle)*0.6;
+      br.rotation.x = Math.sin(bAngle)*0.6;
+      br.castShadow = true;
+      trunk.add(br);
+      branches.push({mesh:br, angle:bAngle, len:bLen});
+    }
+
+    // Foliage clusters — multi-layer billboards with PBR
+    const foliageColors = variety===0
+      ? [0x1a5a1a, 0x0d4a12, 0x226622, 0x1a6a20, 0x0a3a10]  // dark conifer
+      : [0x2a6a18, 0x1a5a14, 0x336622, 0x22781a, 0x145010]; // deciduous green
+
+    const foliageBase = variety===0 ? trunkH*0.35 : trunkH*0.4;
+    const layerCount = 4 + Math.floor(Math.random()*3);
+
+    for(let l=0;l<layerCount;l++){
+      const lt = l/layerCount;
+      const radius = (1.8-lt*1.0)*scale * (0.85+Math.random()*0.3);
+      const ht = (1.4-lt*0.4)*scale;
+      const ly = foliageBase + l*1.1*scale;
+      
+      if(variety===0) {
+        // Conifer: cone layers
+        const cGeo = new THREE.ConeGeometry(radius, ht, 8+l, 3);
+        const cp = cGeo.attributes.position;
+        for(let i=0;i<cp.count;i++){
+          cp.setX(i, cp.getX(i)+(Math.random()-.5)*0.12*scale);
+          cp.setZ(i, cp.getZ(i)+(Math.random()-.5)*0.12*scale);
+        }
+        cGeo.computeVertexNormals();
+        const col = foliageColors[Math.floor(Math.random()*foliageColors.length)];
+        const cMat = new THREE.MeshStandardMaterial({color:col, roughness:0.85, metalness:0.0, side:THREE.FrontSide});
+        const cone = new THREE.Mesh(cGeo, cMat);
+        cone.position.set((Math.random()-.5)*0.2*scale, ly-trunkH/2, (Math.random()-.5)*0.2*scale);
+        cone.castShadow = true;
+        trunk.add(cone);
+      } else {
+        // Deciduous: sphere clusters
+        const subCount = 3+l;
+        for(let s=0;s<subCount;s++){
+          const sa = (s/subCount)*Math.PI*2+Math.random()*1.0;
+          const sr = radius*(0.35+Math.random()*0.45);
+          const sGeo = new THREE.SphereGeometry(sr, 7, 5);
+          const sp = sGeo.attributes.position;
+          for(let i=0;i<sp.count;i++){
+            sp.setX(i, sp.getX(i)+(Math.random()-.5)*0.18*scale);
+            sp.setY(i, sp.getY(i)+(Math.random()-.5)*0.18*scale);
+            sp.setZ(i, sp.getZ(i)+(Math.random()-.5)*0.18*scale);
+          }
+          sGeo.computeVertexNormals();
+          const col = foliageColors[Math.floor(Math.random()*foliageColors.length)];
+          const sMat = new THREE.MeshStandardMaterial({color:col, roughness:0.88, metalness:0.0});
+          const sphere = new THREE.Mesh(sGeo, sMat);
+          sphere.position.set(
+            Math.cos(sa)*radius*0.55 + (Math.random()-.5)*0.25*scale,
+            ly - trunkH/2 + (Math.random()-.5)*0.6*scale,
+            Math.sin(sa)*radius*0.55 + (Math.random()-.5)*0.25*scale
+          );
+          sphere.castShadow = true;
+          sphere.receiveShadow = true;
+          trunk.add(sphere);
+        }
+      }
+    }
+
+    group.position.set(x, -2.4, z);
+    group.userData = {
+      windPhase: Math.random()*Math.PI*2,
+      windSpeed: 0.35+Math.random()*0.5,
+      windAmp: 0.012+Math.random()*0.015,
+      trunkH: trunkH,
+      variety: variety
+    };
+    return group;
+  }
+
+  // Plant forest
+  const trees = [];
+  const treePositions = [];
+  
+  // Background trees (large, far)
+  for(let i=0;i<50;i++){
+    const angle = Math.random()*Math.PI*2;
+    const radius = 18 + Math.random()*30;
+    const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius - 8;
+    const variety = Math.random()>.45 ? 0 : 1;
+    const scale = 0.8+Math.random()*0.9;
+    const tree = buildTree(x, z, scale, variety);
+    scene.add(tree);
+    trees.push(tree);
+  }
+  // Mid trees
+  for(let i=0;i<30;i++){
+    const angle = Math.random()*Math.PI*2;
+    const radius = 8 + Math.random()*16;
+    const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius - 4;
+    const variety = Math.random()>.4 ? 0 : 1;
+    const scale = 0.65+Math.random()*0.6;
+    const tree = buildTree(x, z, scale, variety);
+    scene.add(tree);
+    trees.push(tree);
+  }
+
+  // ── VOLUMETRIC PARTICLES (pollen + mist dust) ──
+  const pCount = 1200;
+  const pPos = new Float32Array(pCount*3);
+  const pVel = [];
+  for(let i=0;i<pCount;i++){
+    pPos[i*3]   = (Math.random()-.5)*70;
+    pPos[i*3+1] = Math.random()*18-2;
+    pPos[i*3+2] = (Math.random()-.5)*70;
+    pVel.push({x:(Math.random()-.5)*0.015, y:-0.008-Math.random()*0.012, z:(Math.random()-.5)*0.015, ph:Math.random()*Math.PI*2, sp:0.3+Math.random()*0.7});
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3));
+  
+  // Circular particle texture
+  const pCanvas = document.createElement('canvas'); pCanvas.width=32; pCanvas.height=32;
+  const pc = pCanvas.getContext('2d');
+  const pg = pc.createRadialGradient(16,16,0,16,16,16);
+  pg.addColorStop(0,'rgba(200,255,180,1)'); pg.addColorStop(1,'rgba(200,255,180,0)');
+  pc.fillStyle=pg; pc.fillRect(0,0,32,32);
+  const pTex = new THREE.CanvasTexture(pCanvas);
+  
+  const pMat = new THREE.PointsMaterial({color:0xaaf5a0, size:0.07, sizeAttenuation:true, transparent:true, opacity:0.55, map:pTex, alphaTest:0.01, depthWrite:false});
+  const pts = new THREE.Points(pGeo, pMat);
+  scene.add(pts);
+
+  // ── CAMERA & SCROLL ──
+  let scrollY = 0;
+  window.addEventListener('scroll',()=>{ scrollY = window.scrollY; });
+
+  // Cinematic intro: start far, pull in
+  let camAngle = 0, camRadius = 30, camTargetRadius = 26;
+  const camStartY = 12, camEndY = 3.5;
+  let introTime = 0;
+
+  let t = 0;
+  (function animate(){
+    requestAnimationFrame(animate);
+    t += 0.006;
+    introTime = Math.min(introTime+0.008, 1);
+
+    // Wind on trees
+    trees.forEach(tree=>{
+      const d = tree.userData;
+      const wind = Math.sin(t*d.windSpeed + d.windPhase);
+      const gust = Math.sin(t*d.windSpeed*0.4 + d.windPhase+1)*0.4;
+      tree.rotation.z = (wind+gust) * d.windAmp;
+      tree.rotation.x = Math.sin(t*d.windSpeed*0.6 + d.windPhase+2) * d.windAmp*0.5;
+    });
+
+    // Dappled light shimmer
+    dappledLights.forEach(dl=>{
+      dl.light.intensity = 0.3 + Math.sin(t*1.2+dl.ph)*0.15;
+      dl.light.position.x = dl.ox + Math.sin(t*0.4+dl.ph)*1.5;
+    });
+
+    // Particles drift
+    const pa = pts.geometry.attributes.position;
+    for(let i=0;i<pCount;i++){
+      const v=pVel[i];
+      pa.array[i*3]   += v.x + Math.sin(t*v.sp+v.ph)*0.004;
+      pa.array[i*3+1] += v.y;
+      pa.array[i*3+2] += v.z;
+      if(pa.array[i*3+1] < -3){ pa.array[i*3+1]=18; pa.array[i*3]=(Math.random()-.5)*70; pa.array[i*3+2]=(Math.random()-.5)*70; }
+    }
+    pa.needsUpdate = true;
+
+    // Camera: cinematic intro orbit + scroll zoom
+    camAngle += 0.002;
+    const scrollZoom = Math.min(scrollY*0.016, 18);
+    const eased = 1-Math.pow(1-introTime,4);
+    const curRadius = THREE.MathUtils.lerp(38, 26-scrollZoom, eased);
+    camera.position.x = Math.sin(camAngle)*curRadius;
+    camera.position.z = Math.cos(camAngle)*curRadius;
+    camera.position.y = THREE.MathUtils.lerp(camStartY, 3.5-scrollZoom*0.2, eased);
+    camera.lookAt(0, 2.5, 0);
+
+    renderer.render(scene, camera);
+  })();
+
+  window.addEventListener('resize',()=>{
+    const w=canvas.offsetWidth, h=canvas.offsetHeight;
+    renderer.setSize(w,h);
+    camera.aspect=w/h;
+    camera.updateProjectionMatrix();
+  });
+})();
+
+// ─── STATS SECTION: SINGLE REALISTIC TREE ──────────────────
+(function(){
+  const canvas = document.getElementById('c-tree');
+  if(!canvas) return;
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setSize(320,420);
+  renderer.setClearColor(0,0);
+  renderer.physicallyCorrectLights = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 320/420, 0.1, 100);
+  camera.position.set(3, 5, 9);
+  camera.lookAt(0, 4, 0);
+
+  const hemi = new THREE.HemisphereLight(0x223a2a, 0x060e08, 2);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff5d6, 3);
+  sun.position.set(6,10,5);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.bias=-0.001;
+  scene.add(sun);
+  const back = new THREE.DirectionalLight(0x2a6a40, 0.8);
+  back.position.set(-5,3,-8);
+  scene.add(back);
+
+  // Build one beautiful detailed tree
+  function detailTree(){
+    const g = new THREE.Group();
+    const tH=6.5, tBot=0.24, tTop=0.09;
+    const tGeo=new THREE.CylinderGeometry(tTop,tBot,tH,10,8);
+    const tp=tGeo.attributes.position;
+    for(let i=0;i<tp.count;i++){
+      const y=tp.getY(i), t=(y+tH/2)/tH;
+      tp.setX(i, tp.getX(i)+(Math.sin(t*12)*0.015+t*t*0.08));
+      tp.setZ(i, tp.getZ(i)+(Math.cos(t*9)*0.01));
+    }
+    tGeo.computeVertexNormals();
+    const tMat=new THREE.MeshStandardMaterial({color:0x3a2208, roughness:0.95, metalness:0});
+    const trunk=new THREE.Mesh(tGeo,tMat);
+    trunk.position.y=tH/2; trunk.castShadow=true; trunk.receiveShadow=true;
+    g.add(trunk);
+
+    // Branches
+    const bData=[
+      {h:.5,a:0.3,l:2.2,yr:.6,xr:-.5},
+      {h:.62,a:2.1,l:1.9,yr:.5,xr:-.55},
+      {h:.74,a:3.8,l:1.7,yr:.45,xr:-.5},
+      {h:.84,a:1.2,l:1.4,yr:.4,xr:-.55},
+      {h:.91,a:4.5,l:1.2,yr:.38,xr:-.5},
+    ];
+    bData.forEach(bd=>{
+      const bGeo=new THREE.CylinderGeometry(tTop*.35,tTop*.6,bd.l,5,2);
+      const br=new THREE.Mesh(bGeo,tMat);
+      br.position.set(Math.cos(bd.a)*bd.l*.5, tH*bd.h-tH/2, Math.sin(bd.a)*bd.l*.5);
+      br.rotation.set(Math.sin(bd.a)*bd.xr, bd.yr, Math.cos(bd.a)*bd.xr);
+      br.castShadow=true;
+      trunk.add(br);
+    });
+
+    // Foliage — rich clusters
+    const leafCols=[0x1a5a14,0x226618,0x0d4a10,0x2a7020,0x186414,0x106010];
+    for(let l=0;l<5;l++){
+      const lt=l/5;
+      const y=tH*0.38+l*1.1;
+      const r=(2.2-lt*1.2)*(0.8+Math.random()*.4);
+      const subN=4+l*2;
+      for(let s=0;s<subN;s++){
+        const sa=(s/subN)*Math.PI*2+Math.random()*.8;
+        const sr=r*(0.3+Math.random()*.45);
+        const sGeo=new THREE.SphereGeometry(sr,8,6);
+        const sp=sGeo.attributes.position;
+        for(let i=0;i<sp.count;i++){
+          sp.setX(i, sp.getX(i)+(Math.random()-.5)*0.18);
+          sp.setY(i, sp.getY(i)+(Math.random()-.5)*0.18);
+          sp.setZ(i, sp.getZ(i)+(Math.random()-.5)*0.18);
+        }
+        sGeo.computeVertexNormals();
+        const sm=new THREE.MeshStandardMaterial({color:leafCols[Math.floor(Math.random()*leafCols.length)], roughness:.88, metalness:0});
+        const sp2=new THREE.Mesh(sGeo,sm);
+        sp2.position.set(Math.cos(sa)*r*.6+(Math.random()-.5)*.3, y-tH/2+(Math.random()-.5)*.6, Math.sin(sa)*r*.6+(Math.random()-.5)*.3);
+        sp2.castShadow=true; sp2.receiveShadow=true;
+        trunk.add(sp2);
+      }
+    }
+    return g;
+  }
+
+  const tree=detailTree();
+  tree.position.set(-0.5,-2,0);
+  scene.add(tree);
+
+  let time=0;
+  (function anim(){
+    requestAnimationFrame(anim);
+    time+=0.006;
+    tree.rotation.z=Math.sin(time*.7)*0.015+Math.sin(time*.3)*0.008;
+    renderer.render(scene, camera);
+  })();
+})();
+
+// ─── GLOBE ──────────────────────────────────────────────────
+(function(){
+  const canvas=document.getElementById('c-globe');
+  const S=canvas.offsetWidth||440;
+  const renderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setSize(S,S);
+  renderer.setClearColor(0,0);
+  renderer.physicallyCorrectLights=true;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.0;
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(42,1,0.1,100);
+  camera.position.z=3.5;
+
+  const hemi=new THREE.HemisphereLight(0x1a3a25,0x040a06,1.8);
+  scene.add(hemi);
+  const sun=new THREE.DirectionalLight(0x9af5c0,2.2);
+  sun.position.set(5,3,4);
+  scene.add(sun);
+  const back2=new THREE.DirectionalLight(0x102a60,0.6);
+  back2.position.set(-4,-2,-5);
+  scene.add(back2);
+
+  // Globe
+  const gGeo=new THREE.SphereGeometry(1,64,64);
+  const gMat=new THREE.MeshStandardMaterial({color:0x0a2e14, roughness:0.7, metalness:0.1, emissive:0x030d06, emissiveIntensity:0.3});
+  const globe=new THREE.Mesh(gGeo,gMat);
+  scene.add(globe);
+
+  // Landmass-like patches (green blobs)
+  const landColors=[0x1a5a1e,0x145a12,0x0d4a10,0x226620,0x0a3a0e];
+  for(let i=0;i<28;i++){
+    const phi=Math.random()*Math.PI, theta=Math.random()*Math.PI*2;
+    const sz=0.08+Math.random()*0.18;
+    const lGeo=new THREE.SphereGeometry(sz,6,5);
+    const lMat=new THREE.MeshStandardMaterial({color:landColors[i%landColors.length], roughness:0.95, metalness:0});
+    const land=new THREE.Mesh(lGeo,lMat);
+    const nx=-Math.sin(phi)*Math.cos(theta), ny=Math.cos(phi), nz=Math.sin(phi)*Math.sin(theta);
+    land.position.set(nx,ny,nz).multiplyScalar(1.005);
+    globe.add(land);
+  }
+
+  // Forest zone markers
+  const zones=[[5,-60],[-5,20],[0,110],[55,80],[-25,-50],[10,15],[45,130],[-10,35],[62,25],[-3,105],[20,-100],[35,60],[-15,170],[10,-10]];
+  zones.forEach(([lat,lng])=>{
+    const phi=(90-lat)*(Math.PI/180), theta=(lng+180)*(Math.PI/180);
+    const nx=-Math.sin(phi)*Math.cos(theta), ny=Math.cos(phi), nz=Math.sin(phi)*Math.sin(theta);
+
+    // Glowing dot
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.025,8,8), new THREE.MeshBasicMaterial({color:0x7eff9a}));
+    dot.position.set(nx,ny,nz).multiplyScalar(1.02);
+    globe.add(dot);
+
+    // Pulse ring
+    const ringGeo=new THREE.RingGeometry(0.04,0.055,16);
+    const ringMat=new THREE.MeshBasicMaterial({color:0x7eff9a, transparent:true, opacity:0.3, side:THREE.DoubleSide});
+    const ring=new THREE.Mesh(ringGeo,ringMat);
+    ring.position.copy(dot.position);
+    ring.lookAt(0,0,0);
+    ring.userData={phase:Math.random()*Math.PI*2};
+    globe.add(ring);
+  });
+
+  // Atmosphere
+  const atmMat=new THREE.MeshBasicMaterial({color:0x1a5c32, transparent:true, opacity:0.07, side:THREE.BackSide});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.12,32,32),atmMat));
+  const atm2=new THREE.MeshBasicMaterial({color:0x0a3a20, transparent:true, opacity:0.04, side:THREE.BackSide});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.2,32,32),atm2));
+
+  // Grid lines
+  const gridMat=new THREE.MeshBasicMaterial({color:0x1a5c32, transparent:true, opacity:0.1, wireframe:true});
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.005,20,14),gridMat));
+
+  let t=0;
+  (function anim(){
+    requestAnimationFrame(anim);
+    t+=0.004;
+    globe.rotation.y+=0.003;
+    // Pulse rings
+    globe.children.forEach(c=>{ if(c.userData.phase!==undefined){ c.material.opacity=0.15+Math.sin(t*2+c.userData.phase)*.15; }});
+    renderer.render(scene,camera);
+  })();
+
+  window.addEventListener('resize',()=>{const sz=canvas.offsetWidth; renderer.setSize(sz,sz);});
+})();
+
+// ─── GSAP SCROLL ANIMATIONS ─────────────────────────────────
+gsap.registerPlugin(ScrollTrigger);
+
+// Hero entrance — staggered cinematic reveal
+gsap.timeline({delay:.5})
+  .to('.h-eye',  {opacity:1, y:0, duration:1.1, ease:'power3.out'})
+  .to('.h-title',{opacity:1, y:0, duration:1.4, ease:'power3.out'},'-=.6')
+  .to('.h-sub',  {opacity:1, y:0, duration:1.1, ease:'power3.out'},'-=.7')
+  .to('.btn',    {opacity:1, y:0, duration:.9, ease:'power3.out'},'-=.5')
+  .to('.scroll-ind',{opacity:.7, duration:.8},'-=.4');
+
+gsap.utils.toArray('.reveal').forEach(el=>{
+  gsap.to(el,{opacity:1, y:0, duration:.95, ease:'power3.out',
+    scrollTrigger:{trigger:el, start:'top 86%', toggleActions:'play none none none'}
+  });
+});
+
+// Stat cards
+gsap.utils.toArray('.s-card').forEach((card,i)=>{
+  gsap.to(card,{opacity:1, y:0, duration:.8, delay:i*.13, ease:'power3.out',
+    scrollTrigger:{trigger:'#stats', start:'top 72%'}
+  });
+});
+
+// Counters
+document.querySelectorAll('.s-num').forEach(el=>{
+  const target=parseFloat(el.dataset.t), suffix=el.dataset.s||'', isF=target%1!==0;
+  gsap.to({v:0},{v:target, duration:2.5, ease:'power2.out',
+    onUpdate:function(){ el.textContent=(isF?this.targets()[0].v.toFixed(1):Math.floor(this.targets()[0].v))+suffix; },
+    scrollTrigger:{trigger:'#stats', start:'top 72%', once:true}
+  });
+});
+
+// Service card tilt
+document.querySelectorAll('.srv-card').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+    card.style.transform=`perspective(900px) rotateY(${x*16}deg) rotateX(${-y*12}deg) translateZ(5px)`;
+    card.style.setProperty('--mx',(e.clientX-r.left)/r.width*100+'%');
+    card.style.setProperty('--my',(e.clientY-r.top)/r.height*100+'%');
+  });
+  card.addEventListener('mouseleave',()=>{ card.style.transform=''; });
+});
+
+// Drag scroll
+const srow=document.getElementById('srv-row');
+let dn=false, sx, sl;
+srow.addEventListener('mousedown',e=>{dn=true; srow.style.cursor='grabbing'; sx=e.pageX-srow.offsetLeft; sl=srow.scrollLeft;});
+srow.addEventListener('mouseleave',()=>{dn=false; srow.style.cursor='grab';});
+srow.addEventListener('mouseup',()=>{dn=false; srow.style.cursor='grab';});
+srow.addEventListener('mousemove',e=>{if(!dn) return; e.preventDefault(); srow.scrollLeft=sl-(e.pageX-srow.offsetLeft-sx)*1.6;});
+</script>
+</body>
+</html>
